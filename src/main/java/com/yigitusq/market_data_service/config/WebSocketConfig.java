@@ -17,7 +17,7 @@ public class WebSocketConfig {
     public WebSocketConnectionManager connectionManager(BinanceWebSocketHandler handler) {
         StandardWebSocketClient client = new StandardWebSocketClient();
         WebSocketConnectionManager manager = new WebSocketConnectionManager(client, handler, binanceUrl);
-        manager.setAutoStartup(true); // Proje başlar başlamaz bağlan
+        manager.setAutoStartup(true);
         return manager;
     }
 }
