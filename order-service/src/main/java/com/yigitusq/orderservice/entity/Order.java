@@ -15,9 +15,9 @@ public class Order {
     private Long id;
 
     private Long userId;
-    private String symbol;      // Örn: BTCUSDT
-    private BigDecimal price;   // İşlem fiyatı
+    private String symbol;      // Ex: BTCUSDT
+    private BigDecimal price;   
     private BigDecimal quantity;
-    private String side;        // BUY veya SELL
+    private String side;        // BUY or SELL
     private LocalDateTime createdAt;
 }
