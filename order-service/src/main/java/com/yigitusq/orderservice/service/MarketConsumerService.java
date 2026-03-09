@@ -2,7 +2,7 @@ package com.yigitusq.orderservice.service;
 
 import com.fasterxml.jackson.databind.*;
 import com.yigitusq.orderservice.entity.LimitOrder;
-import com.yigitusq.orderservice.model.BinanceTradeMessage; // Binance modelin burada mı kontrol et
+import com.yigitusq.orderservice.model.BinanceTradeMessage;
 import com.yigitusq.orderservice.repository.LimitOrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,18 +32,45 @@ public class MarketConsumerService {
             BigDecimal currentPrice = new BigDecimal(trade.getPrice());
             String symbol = trade.getSymbol();
 
+            // 1. ALIŞ (BUY) Emirlerini Kontrol Et: Hedef Fiyat >= Piyasa Fiyatı
             List<LimitOrder> pendingBuyOrders = limitOrderRepository
                     .findBySymbolAndStatusAndSideAndTargetPriceGreaterThanEqual(symbol, "PENDING", "BUY", currentPrice);
 
             for (LimitOrder order : pendingBuyOrders) {
-                log.info("Limit Emir Eşleşti! Emir ID: {}", order.getId());
-                tradeService.buyAsset(order.getUserId(), symbol, order.getQuantity(), currentPrice);
-                order.setStatus("COMPLETED");
-                limitOrderRepository.save(order);
+                executeLimitOrder(order, currentPrice);
+            }
+
+            // 2. SATIŞ (SELL) Emirlerini Kontrol Et: Hedef Fiyat <= Piyasa Fiyatı
+            List<LimitOrder> pendingSellOrders = limitOrderRepository
+                    .findBySymbolAndStatusAndSideAndTargetPriceLessThanEqual(symbol, "PENDING", "SELL", currentPrice);
+
+            for (LimitOrder order : pendingSellOrders) {
+                executeLimitOrder(order, currentPrice);
             }
 
         } catch (Exception e) {
             log.error("Kafka işleme hatası: {}", e.getMessage());
+        }
+    }
+
+    private void executeLimitOrder(LimitOrder order, BigDecimal currentPrice) {
+        try {
+            String result;
+            if ("BUY".equals(order.getSide())) {
+                result = tradeService.buyAsset(order.getUserId(), order.getSymbol(), order.getQuantity(), currentPrice);
+            } else {
+                result = tradeService.sellAsset(order.getUserId(), order.getSymbol(), order.getQuantity(), currentPrice);
+            }
+
+            if (result.contains("başarılı")) {
+                order.setStatus("COMPLETED");
+                limitOrderRepository.save(order);
+                log.info("Limit Emir Gerçekleşti! ID: {} | Tip: {} | Gerçekleşen Fiyat: {}", order.getId(), order.getSide(), currentPrice);
+            } else {
+                log.warn("Emir işlenemedi! ID: {} | Sebep: {}", order.getId(), result);
+            }
+        } catch (Exception e) {
+            log.error("Limit emir işlenirken beklenmeyen hata! Emir ID: {}", order.getId(), e);
         }
     }
 }
