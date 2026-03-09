@@ -14,7 +14,7 @@ import java.math.BigDecimal;
 public class OrderController {
 
     private final TradeService tradeService;
-    private final LimitOrderRepository limitOrderRepository; // HATA BURADAYDI, BUNU EKLE
+    private final LimitOrderRepository limitOrderRepository;
 
     @PostMapping("/buy")
     public String buy(@RequestParam Long userId,
@@ -28,5 +28,13 @@ public class OrderController {
     public LimitOrder createLimitOrder(@RequestBody LimitOrder order) {
         order.setStatus("PENDING");
         return limitOrderRepository.save(order);
+    }
+
+    @PostMapping("/sell")
+    public String sell(@RequestParam Long userId,
+                       @RequestParam String symbol,
+                       @RequestParam BigDecimal amount,
+                       @RequestParam BigDecimal price) {
+        return tradeService.sellAsset(userId, symbol, amount, price);
     }
 }
