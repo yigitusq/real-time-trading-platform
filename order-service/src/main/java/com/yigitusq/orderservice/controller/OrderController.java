@@ -5,6 +5,7 @@ import com.yigitusq.orderservice.repository.LimitOrderRepository;
 import com.yigitusq.orderservice.service.TradeService;
 import lombok.*;
 import org.springframework.web.bind.annotation.*;
+import com.yigitusq.orderservice.dto.PortfolioResponse;
 
 import java.math.BigDecimal;
 
@@ -36,5 +37,10 @@ public class OrderController {
                        @RequestParam BigDecimal amount,
                        @RequestParam BigDecimal price) {
         return tradeService.sellAsset(userId, symbol, amount, price);
+    }
+
+    @GetMapping("/portfolio/{userId}")
+    public PortfolioResponse getPortfolio(@PathVariable Long userId) {
+        return tradeService.getPortfolio(userId);
     }
 }

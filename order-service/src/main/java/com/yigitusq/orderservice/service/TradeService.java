@@ -1,5 +1,6 @@
 package com.yigitusq.orderservice.service;
 
+import com.yigitusq.orderservice.dto.PortfolioResponse;
 import com.yigitusq.orderservice.entity.*;
 import com.yigitusq.orderservice.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @Slf4j
@@ -17,11 +19,13 @@ public class TradeService {
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
     private final AssetRepository assetRepository;
+    private final PriceService priceService;
 
     @Transactional
     public String buyAsset(Long userId, String symbol, BigDecimal amount, BigDecimal currentPrice) {
         User user = userRepository.findById(userId).orElseThrow();
         BigDecimal totalCost = currentPrice.multiply(amount);
+
 
         if (user.getBalance().compareTo(totalCost) < 0) return "Bakiye yetersiz!";
 
@@ -74,5 +78,38 @@ public class TradeService {
         order.setSide(side);
         order.setCreatedAt(LocalDateTime.now());
         orderRepository.save(order);
+    }
+
+    public PortfolioResponse getPortfolio(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
+
+        List<Asset> assets = assetRepository.findAllByUserId(userId);
+
+        BigDecimal totalAssetsValue = BigDecimal.ZERO;
+        List<PortfolioResponse.AssetDetail> assetDetails = new java.util.ArrayList<>();
+
+        // Kullanıcının elindeki tüm coinleri dön ve anlık fiyatla çarp
+        for (Asset asset : assets) {
+            BigDecimal currentPrice = priceService.getPrice(asset.getSymbol());
+            BigDecimal assetValue = asset.getQuantity().multiply(currentPrice); // Miktar * Güncel Fiyat
+            totalAssetsValue = totalAssetsValue.add(assetValue);
+
+            PortfolioResponse.AssetDetail detail = new PortfolioResponse.AssetDetail();
+            detail.setSymbol(asset.getSymbol());
+            detail.setQuantity(asset.getQuantity());
+            detail.setCurrentPrice(currentPrice);
+            detail.setTotalValue(assetValue);
+            assetDetails.add(detail);
+        }
+
+        PortfolioResponse response = new PortfolioResponse();
+        response.setUserId(userId);
+        response.setCashBalance(user.getBalance());
+        response.setTotalAssetsValue(totalAssetsValue);
+        response.setTotalPortfolioValue(user.getBalance().add(totalAssetsValue));
+        response.setAssets(assetDetails);
+
+        return response;
     }
 }
