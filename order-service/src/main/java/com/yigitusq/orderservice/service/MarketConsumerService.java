@@ -25,7 +25,8 @@ public class MarketConsumerService {
     @KafkaListener(topics = "market-prices", groupId = "order-service-group")
     public void consumeMarketData(String message) {
         try {
-            String jsonToParse = message.startsWith("\"") ? objectMapper.readTree(message).asText() : message;
+            String jsonToParse = message.startsWith("\"")
+                    ? objectMapper.readTree(message).asText() : message;
             BinanceTradeMessage trade = objectMapper.readValue(jsonToParse, BinanceTradeMessage.class);
 
             if (trade.getSymbol() == null || trade.getPrice() == null) return;
@@ -34,21 +35,30 @@ public class MarketConsumerService {
             String symbol = trade.getSymbol();
             priceService.updatePrice(symbol, currentPrice);
 
-            // 1. ALIŞ (BUY) Emirlerini Kontrol Et: Hedef Fiyat >= Piyasa Fiyatı
+            // --- LIMIT emirleri (mevcut mantık korunuyor) ---
             List<LimitOrder> pendingBuyOrders = limitOrderRepository
-                    .findBySymbolAndStatusAndSideAndTargetPriceGreaterThanEqual(symbol, "PENDING", "BUY", currentPrice);
+                    .findBySymbolAndStatusAndSideAndOrderTypeAndTargetPriceGreaterThanEqual(
+                            symbol, "PENDING", "BUY", "LIMIT", currentPrice);
+            pendingBuyOrders.forEach(o -> executeLimitOrder(o, currentPrice));
 
-            for (LimitOrder order : pendingBuyOrders) {
-                executeLimitOrder(order, currentPrice);
-            }
-
-            // 2. SATIŞ (SELL) Emirlerini Kontrol Et: Hedef Fiyat <= Piyasa Fiyatı
             List<LimitOrder> pendingSellOrders = limitOrderRepository
-                    .findBySymbolAndStatusAndSideAndTargetPriceLessThanEqual(symbol, "PENDING", "SELL", currentPrice);
+                    .findBySymbolAndStatusAndSideAndOrderTypeAndTargetPriceLessThanEqual(
+                            symbol, "PENDING", "SELL", "LIMIT", currentPrice);
+            pendingSellOrders.forEach(o -> executeLimitOrder(o, currentPrice));
 
-            for (LimitOrder order : pendingSellOrders) {
-                executeLimitOrder(order, currentPrice);
-            }
+            // --- STOP-LOSS: Fiyat stopPrice'ın ALTINA düşünce sat ---
+            List<LimitOrder> stopLossOrders = limitOrderRepository
+                    .findBySymbolAndStatusAndOrderType(symbol, "PENDING", "STOP_LOSS");
+            stopLossOrders.stream()
+                    .filter(o -> currentPrice.compareTo(o.getStopPrice()) <= 0)
+                    .forEach(o -> executeLimitOrder(o, currentPrice));
+
+            // --- TAKE-PROFIT: Fiyat targetPrice'ın ÜSTÜNE çıkınca sat ---
+            List<LimitOrder> takeProfitOrders = limitOrderRepository
+                    .findBySymbolAndStatusAndOrderType(symbol, "PENDING", "TAKE_PROFIT");
+            takeProfitOrders.stream()
+                    .filter(o -> currentPrice.compareTo(o.getTargetPrice()) >= 0)
+                    .forEach(o -> executeLimitOrder(o, currentPrice));
 
         } catch (Exception e) {
             log.error("Kafka işleme hatası: {}", e.getMessage());

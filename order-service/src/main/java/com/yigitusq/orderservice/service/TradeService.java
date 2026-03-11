@@ -9,7 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -44,7 +46,16 @@ public class TradeService {
         asset.setSymbol(symbol);
 
         BigDecimal currentQty = asset.getQuantity() != null ? asset.getQuantity() : BigDecimal.ZERO;
-        asset.setQuantity(currentQty.add(amount));
+        BigDecimal currentAvgCost = asset.getAverageCost() != null ? asset.getAverageCost() : BigDecimal.ZERO;
+        // Ağırlıklı ortalama formülü:
+        // newAvg = ((mevcutMiktar * mevcutOrtalama) + (yeniMiktar * yeniFiyat)) / (mevcutMiktar + yeniMiktar)
+        BigDecimal newQty = currentQty.add(amount);
+        BigDecimal newAvgCost = (currentQty.multiply(currentAvgCost))
+                .add(amount.multiply(currentPrice))
+                .divide(newQty, 8, RoundingMode.HALF_UP);
+
+        asset.setQuantity(newQty);
+        asset.setAverageCost(newAvgCost);
         assetRepository.save(asset);
 
         saveOrder(userId, symbol, amount, currentPrice, "BUY");
@@ -113,20 +124,51 @@ public class TradeService {
         List<Asset> assets = assetRepository.findAllByUserId(userId);
 
         BigDecimal totalAssetsValue = BigDecimal.ZERO;
-        List<PortfolioResponse.AssetDetail> assetDetails = new java.util.ArrayList<>();
+        BigDecimal totalUnrealizedPnl = BigDecimal.ZERO;
+        List<PortfolioResponse.AssetDetail> assetDetails = new ArrayList<>();
 
-        // Kullanıcının elindeki tüm coinleri dön ve anlık fiyatla çarp
         for (Asset asset : assets) {
             BigDecimal currentPrice = priceService.getPrice(asset.getSymbol());
-            BigDecimal assetValue = asset.getQuantity().multiply(currentPrice); // Miktar * Güncel Fiyat
+            BigDecimal assetValue = asset.getQuantity().multiply(currentPrice);
             totalAssetsValue = totalAssetsValue.add(assetValue);
+
+            // P&L Hesabı
+            BigDecimal avgCost = asset.getAverageCost() != null ? asset.getAverageCost() : BigDecimal.ZERO;
+            BigDecimal costBasis = avgCost.multiply(asset.getQuantity()); // Toplam alış maliyeti
+            BigDecimal unrealizedPnl = assetValue.subtract(costBasis);   // Kar/Zarar ($)
+
+            // Yüzde hesabı — sıfıra bölme koruması
+            BigDecimal unrealizedPnlPercent = BigDecimal.ZERO;
+            if (costBasis.compareTo(BigDecimal.ZERO) > 0) {
+                unrealizedPnlPercent = unrealizedPnl
+                        .divide(costBasis, 4, RoundingMode.HALF_UP)
+                        .multiply(new BigDecimal("100"));
+            }
+
+            totalUnrealizedPnl = totalUnrealizedPnl.add(unrealizedPnl);
 
             PortfolioResponse.AssetDetail detail = new PortfolioResponse.AssetDetail();
             detail.setSymbol(asset.getSymbol());
             detail.setQuantity(asset.getQuantity());
+            detail.setAverageCost(avgCost);
             detail.setCurrentPrice(currentPrice);
             detail.setTotalValue(assetValue);
+            detail.setUnrealizedPnl(unrealizedPnl);
+            detail.setUnrealizedPnlPercent(unrealizedPnlPercent);
             assetDetails.add(detail);
+        }
+
+        // Toplam portföy P&L yüzdesi
+        BigDecimal totalCostBasis = assets.stream()
+                .map(a -> (a.getAverageCost() != null ? a.getAverageCost() : BigDecimal.ZERO)
+                        .multiply(a.getQuantity()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalPnlPercent = BigDecimal.ZERO;
+        if (totalCostBasis.compareTo(BigDecimal.ZERO) > 0) {
+            totalPnlPercent = totalUnrealizedPnl
+                    .divide(totalCostBasis, 4, RoundingMode.HALF_UP)
+                    .multiply(new BigDecimal("100"));
         }
 
         PortfolioResponse response = new PortfolioResponse();
@@ -134,6 +176,8 @@ public class TradeService {
         response.setCashBalance(user.getBalance());
         response.setTotalAssetsValue(totalAssetsValue);
         response.setTotalPortfolioValue(user.getBalance().add(totalAssetsValue));
+        response.setTotalUnrealizedPnl(totalUnrealizedPnl);
+        response.setTotalUnrealizedPnlPercent(totalPnlPercent);
         response.setAssets(assetDetails);
 
         return response;

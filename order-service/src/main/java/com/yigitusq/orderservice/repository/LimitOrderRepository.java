@@ -7,13 +7,12 @@ import java.util.List;
 
 public interface LimitOrderRepository extends JpaRepository<LimitOrder, Long> {
 
-    // Alış emri için: Hedef fiyat >= Piyasa fiyatı (Fiyat düştüğünde al)
-    List<LimitOrder> findBySymbolAndStatusAndSideAndTargetPriceGreaterThanEqual(
-            String symbol, String status, String side, BigDecimal currentPrice);
+    List<LimitOrder> findBySymbolAndStatusAndSideAndOrderTypeAndTargetPriceGreaterThanEqual(
+            String symbol, String status, String side, String orderType, BigDecimal currentPrice);
 
-    // Satış emri için: Hedef fiyat <= Piyasa fiyatı (Fiyat yükseldiğinde sat)
-    List<LimitOrder> findBySymbolAndStatusAndSideAndTargetPriceLessThanEqual(
-            String symbol, String status, String side, BigDecimal currentPrice);
+    List<LimitOrder> findBySymbolAndStatusAndSideAndOrderTypeAndTargetPriceLessThanEqual(
+            String symbol, String status, String side, String orderType, BigDecimal currentPrice);
 
-    List<LimitOrder> findBySymbolAndSideAndStatus(String symbol, String side, String status);
+    List<LimitOrder> findBySymbolAndStatusAndOrderType(
+            String symbol, String status, String orderType);
 }

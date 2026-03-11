@@ -13,6 +13,7 @@ public class Asset {
     private Long id;
 
     private Long userId;
-    private String symbol; // Örn: BTCUSDT
-    private BigDecimal quantity; // Elindeki miktar
+    private String symbol;
+    private BigDecimal quantity;
+    private BigDecimal averageCost; // ortalama alış fiyatı
 }

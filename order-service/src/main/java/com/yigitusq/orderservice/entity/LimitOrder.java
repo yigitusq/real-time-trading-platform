@@ -19,4 +19,6 @@ public class LimitOrder {
     private BigDecimal quantity;
     private String side;        // BUY veya SELL
     private String status;      // PENDING, COMPLETED
+    private String orderType; // LIMIT, STOP_LOSS, TAKE_PROFIT
+    private BigDecimal stopPrice;
 }

@@ -7,16 +7,21 @@ import java.util.List;
 @Data
 public class PortfolioResponse {
     private Long userId;
-    private BigDecimal cashBalance;        // Nakit Doları
-    private BigDecimal totalAssetsValue;   // Coinlerinin toplam dolar değeri
-    private BigDecimal totalPortfolioValue;// Nakit + Coinlerin toplamı
-    private List<AssetDetail> assets;      // Hangi coinden ne kadar var?
+    private BigDecimal cashBalance;
+    private BigDecimal totalAssetsValue;
+    private BigDecimal totalPortfolioValue;
+    private BigDecimal totalUnrealizedPnl;        // toplam kar/zarar ($)
+    private BigDecimal totalUnrealizedPnlPercent; // toplam kar/zarar (%)
+    private List<AssetDetail> assets;
 
     @Data
     public static class AssetDetail {
         private String symbol;
         private BigDecimal quantity;
+        private BigDecimal averageCost;
         private BigDecimal currentPrice;
         private BigDecimal totalValue;
+        private BigDecimal unrealizedPnl;        // bu coinin kar/zarar ($)
+        private BigDecimal unrealizedPnlPercent; // bu coinin kar/zarar (%)
     }
 }
