@@ -21,6 +21,7 @@ public class TradeService {
     private final OrderRepository orderRepository;
     private final AssetRepository assetRepository;
     private final PriceService priceService;
+    private final TradeHistoryRepository tradeHistoryRepository;
 
     @Transactional
     public String buyAsset(Long userId, String symbol, BigDecimal amount, BigDecimal currentPrice) {
@@ -47,6 +48,16 @@ public class TradeService {
         assetRepository.save(asset);
 
         saveOrder(userId, symbol, amount, currentPrice, "BUY");
+        // İşlem Geçmişini (Makbuz) Kaydet
+        TradeHistory history = new TradeHistory();
+        history.setUserId(userId);
+        history.setSymbol(symbol);
+        history.setSide("BUY");
+        history.setQuantity(amount);
+        history.setPrice(currentPrice);
+        history.setTotalAmount(totalCost);
+        history.setTimestamp(java.time.LocalDateTime.now());
+        tradeHistoryRepository.save(history);
         return "Alım başarılı. Yeni bakiye: " + user.getBalance();
     }
 
@@ -66,11 +77,21 @@ public class TradeService {
 
         // 3. Nakit bakiyeyi artır (Satıştan gelen para)
         User user = userRepository.findById(userId).orElseThrow();
-        BigDecimal totalGain = currentPrice.multiply(amount);
-        user.setBalance(user.getBalance().add(totalGain));
+        BigDecimal totalRevenue = currentPrice.multiply(amount);
+        user.setBalance(user.getBalance().add(totalRevenue));
         userRepository.save(user);
 
         saveOrder(userId, symbol, amount, currentPrice, "SELL");
+        // İşlem Geçmişini (Makbuz) Kaydet
+        TradeHistory history = new TradeHistory();
+        history.setUserId(userId);
+        history.setSymbol(symbol);
+        history.setSide("SELL");
+        history.setQuantity(amount);
+        history.setPrice(currentPrice);
+        history.setTotalAmount(totalRevenue);
+        history.setTimestamp(java.time.LocalDateTime.now());
+        tradeHistoryRepository.save(history);
         return "Satış başarılı. Yeni bakiye: " + user.getBalance();
     }
 
