@@ -20,6 +20,7 @@ public class MarketConsumerService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final TradeService tradeService;
     private final LimitOrderRepository limitOrderRepository;
+    private final PriceService priceService;
 
     @KafkaListener(topics = "market-prices", groupId = "order-service-group")
     public void consumeMarketData(String message) {
@@ -31,6 +32,7 @@ public class MarketConsumerService {
 
             BigDecimal currentPrice = new BigDecimal(trade.getPrice());
             String symbol = trade.getSymbol();
+            priceService.updatePrice(symbol, currentPrice);
 
             // 1. ALIŞ (BUY) Emirlerini Kontrol Et: Hedef Fiyat >= Piyasa Fiyatı
             List<LimitOrder> pendingBuyOrders = limitOrderRepository

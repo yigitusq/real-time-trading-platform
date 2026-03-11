@@ -10,4 +10,5 @@ public interface AssetRepository extends JpaRepository<Asset, Long> {
     // Kullanıcının belirli bir semboldeki varlığını bulmak için
     Optional<Asset> findByUserIdAndSymbol(Long userId, String symbol);
     List<Asset> findAllByUserId(Long userId);
+
 }

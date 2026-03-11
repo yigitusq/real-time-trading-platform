@@ -2,6 +2,7 @@ package com.yigitusq.orderservice.service;
 
 import com.yigitusq.orderservice.dto.PortfolioResponse;
 import com.yigitusq.orderservice.entity.*;
+import com.yigitusq.orderservice.exception.TradeException;
 import com.yigitusq.orderservice.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +28,9 @@ public class TradeService {
         BigDecimal totalCost = currentPrice.multiply(amount);
 
 
-        if (user.getBalance().compareTo(totalCost) < 0) return "Bakiye yetersiz!";
+        if (user.getBalance().compareTo(totalCost) < 0) {
+            throw new TradeException("Yetersiz bakiye! İşlem tutarı: " + totalCost + "$, Mevcut nakit: " + user.getBalance() + "$");
+        }
 
         // 1. Nakit bakiyeyi düş
         user.setBalance(user.getBalance().subtract(totalCost));
@@ -51,9 +54,11 @@ public class TradeService {
     public String sellAsset(Long userId, String symbol, BigDecimal amount, BigDecimal currentPrice) {
         // 1. Kullanıcının elinde bu coin var mı bak
         Asset asset = assetRepository.findByUserIdAndSymbol(userId, symbol)
-                .orElseThrow(() -> new RuntimeException("Bu varlığa sahip değilsiniz!"));
+                .orElseThrow(() -> new TradeException("Cüzdanınızda " + symbol + " bulunamadı!"));
 
-        if (asset.getQuantity().compareTo(amount) < 0) return "Yetersiz varlık miktarı!";
+        if (asset.getQuantity().compareTo(amount) < 0) {
+            throw new TradeException("Yetersiz miktar! Satmak istediğiniz: " + amount + ", Elinizdeki: " + asset.getQuantity());
+        }
 
         // 2. Coin miktarını düş
         asset.setQuantity(asset.getQuantity().subtract(amount));
@@ -82,7 +87,7 @@ public class TradeService {
 
     public PortfolioResponse getPortfolio(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
+                .orElseThrow(() -> new TradeException("Kullanıcı bulunamadı! ID: " + userId));
 
         List<Asset> assets = assetRepository.findAllByUserId(userId);
 
