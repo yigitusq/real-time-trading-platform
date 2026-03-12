@@ -82,22 +82,25 @@ public class MarketConsumerService {
 
     private void executeLimitOrder(LimitOrder order, BigDecimal currentPrice) {
         try {
-            String result;
+            // İşlemi dene
             if ("BUY".equals(order.getSide())) {
-                result = tradeService.buyAsset(order.getUserId(), order.getSymbol(), order.getQuantity(), currentPrice);
+                tradeService.buyAsset(order.getUserId(), order.getSymbol(), order.getQuantity(), currentPrice);
             } else {
-                result = tradeService.sellAsset(order.getUserId(), order.getSymbol(), order.getQuantity(), currentPrice);
+                tradeService.sellAsset(order.getUserId(), order.getSymbol(), order.getQuantity(), currentPrice);
             }
 
-            if (result.contains("başarılı")) {
-                order.setStatus("COMPLETED");
-                limitOrderRepository.save(order);
-                log.info("Limit Emir Gerçekleşti! ID: {} | Tip: {} | Gerçekleşen Fiyat: {}", order.getId(), order.getSide(), currentPrice);
-            } else {
-                log.warn("Emir işlenemedi! ID: {} | Sebep: {}", order.getId(), result);
-            }
+            // Exception fırlamadıysa işlem BAŞARILI demektir!
+            order.setStatus("COMPLETED");
+            limitOrderRepository.save(order);
+            log.info("Emir Gerçekleşti! ID: {} | Tip: {} | Gerçekleşen Fiyat: {}", order.getId(), order.getOrderType(), currentPrice);
+
+        } catch (com.yigitusq.orderservice.exception.TradeException e) {
+            order.setStatus("FAILED");
+            limitOrderRepository.save(order);
+            log.warn("Emir İptal Edildi (Yetersiz Bakiye/Varlık)! ID: {} | Sebep: {}", order.getId(), e.getMessage());
+
         } catch (Exception e) {
-            log.error("Limit emir işlenirken beklenmeyen hata! Emir ID: {}", order.getId(), e);
+            log.error("Limit emir işlenirken beklenmeyen sistem hatası! Emir ID: {}", order.getId(), e);
         }
     }
 }
