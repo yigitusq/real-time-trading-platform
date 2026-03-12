@@ -6,6 +6,7 @@ import com.yigitusq.orderservice.exception.TradeException;
 import com.yigitusq.orderservice.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -24,6 +25,7 @@ public class TradeService {
     private final AssetRepository assetRepository;
     private final PriceService priceService;
     private final TradeHistoryRepository tradeHistoryRepository;
+    private final KafkaTemplate<String, String> kafkaTemplate;
 
     @Transactional
     public String buyAsset(Long userId, String symbol, BigDecimal amount, BigDecimal currentPrice) {
@@ -69,6 +71,8 @@ public class TradeService {
         history.setTotalAmount(totalCost);
         history.setTimestamp(java.time.LocalDateTime.now());
         tradeHistoryRepository.save(history);
+        String message = "Tebrikler! " + currentPrice + "$ fiyatından " + amount + " adet " + symbol + " satın aldınız.";
+        kafkaTemplate.send("notifications", message);
         return "Alım başarılı. Yeni bakiye: " + user.getBalance();
     }
 
@@ -103,6 +107,8 @@ public class TradeService {
         history.setTotalAmount(totalRevenue);
         history.setTimestamp(java.time.LocalDateTime.now());
         tradeHistoryRepository.save(history);
+        String message = "Tebrikler! " + currentPrice + "$ fiyatından " + amount + " adet " + symbol + " satın aldınız.";
+        kafkaTemplate.send("notifications", message);
         return "Satış başarılı. Yeni bakiye: " + user.getBalance();
     }
 
